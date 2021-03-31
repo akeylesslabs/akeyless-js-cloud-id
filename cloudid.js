@@ -1,23 +1,25 @@
 
 const AWS = require('aws-sdk')
-var aws4 = require('aws4')
+const aws4 = require('aws4')
 
 
 
-async function getCloudId(acc_type, param, callback) {
+function getCloudId(acc_type, param, callback) {
     if (acc_type === "aws_iam") {
         getAWsCloudId(callback)
     } else if (acc_type === "azure_ad") {
         getAzureCloudID(param, callback)
     } else if (acc_type === "gcp") {
         getGcpCloudID(param, callback)
+    } else if (acc_type === "access_key") {
+        callback(undefined, "")
     } else {
         callback(new Error("Invalid access type"), undefined);
     }
 }
 
 //callback(err, res)
-async function getAzureCloudID(object_id, callback) {
+function getAzureCloudID(object_id, callback) {
 
     const headers = { 'user-agent': 'AKEYLESS', 'Metadata': 'true' }
     const params = { 'api-version': '2018-02-01', 'resource': 'https://management.azure.com/', 'object_id': object_id }
@@ -28,12 +30,12 @@ async function getAzureCloudID(object_id, callback) {
 }
 
 //callback(err, res)
-async function getGcpCloudID(gcp_audience, callback) {
+function getGcpCloudID(gcp_audience, callback) {
     //todo
 }
 
 //callback(err, res)
-async function getAWsCloudId(callback) {
+function getAWsCloudId(callback) {
     AWS.config.getCredentials(function (err) {
         if (err) {
             callback(err, undefined);
