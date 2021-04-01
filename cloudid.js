@@ -1,7 +1,7 @@
 
 const AWS = require('aws-sdk')
 const aws4 = require('aws4')
-
+const axios = require('axios')
 
 
 function getCloudId(acc_type, param, callback) {
