@@ -2,6 +2,8 @@
 const AWS = require('aws-sdk')
 const aws4 = require('aws4')
 const axios = require('axios')
+const { GoogleAuth } = require('google-auth-library');
+const { IAMCredentialsClient } = require('@google-cloud/iam-credentials');
 
 
 function getCloudId(acc_type, param, callback) {
@@ -29,9 +31,38 @@ function getAzureCloudID(object_id, callback) {
     }).catch((error) => callback(err, undefined));
 }
 
+
 //callback(err, res)
-function getGcpCloudID(gcp_audience, callback) {
-    //todo
+async function getGcpCloudID(audience, callback) {
+    const auth = new GoogleAuth({
+        scopes: 'https://www.googleapis.com/auth/cloud-platform'
+    });
+    try {
+        const crd = await auth.getApplicationDefault()
+        const minute = 60 * 1000;
+        const expiresAt = (Date.now() + minute * 10) / 1000;
+
+        if (crd.credential.key && crd.credential.email) {
+            const iamclient = new IAMCredentialsClient();
+            const Payload = { 'aud': 'akeyless.io', 'exp': Math.round(expiresAt), 'sub': crd.credential.email }
+            const token = await iamclient.signJwt({
+                name: `projects/-/serviceAccounts/${crd.credential.email}`,
+                payload: JSON.stringify(Payload),
+            });
+            const res = Buffer.from(token[0].signedJwt).toString('base64')
+            callback(undefined, res)
+
+        } else {
+            const oAuth2Client = await auth.getIdTokenClient(audience);
+            const clientHeaders = await oAuth2Client.getRequestHeaders();
+            const token = clientHeaders['Authorization'];
+            const res = Buffer.from(token.slice(7)).toString('base64')
+            callback(undefined, res)
+        }
+
+    } catch (e) {
+        callback(e, undefined);
+    }
 }
 
 //callback(err, res)
@@ -39,9 +70,7 @@ function getAWsCloudId(callback) {
     AWS.config.getCredentials(function (err) {
         if (err) {
             callback(err, undefined);
-        }
-        // credentials not loaded
-        else {
+        } else {
             const result = stsGetCallerIdentity(AWS.config.credentials)
             callback(undefined, result);
         }
@@ -76,7 +105,6 @@ function stsGetCallerIdentity(creds) {
         'sts_request_headers': Buffer.from(myheaders).toString('base64')
     };
     const awsData = JSON.stringify(obj)
-
     return Buffer.from(awsData).toString('base64')
 }
 
@@ -84,5 +112,6 @@ function stsGetCallerIdentity(creds) {
 module.exports = {
     getAWsCloudId: getAWsCloudId,
     getAzureCloudID: getAzureCloudID,
+    getGcpCloudID: getGcpCloudID,
     getCloudId: getCloudId,
 }
