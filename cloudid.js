@@ -28,7 +28,7 @@ function getAzureCloudID(object_id, callback) {
 
     axios.get('http://169.254.169.254/metadata/identity/oauth2/token', { params, headers }).then(res => {
         callback(undefined, Buffer.from(res.data.access_token).toString('base64'));
-    }).catch((error) => callback(err, undefined));
+    }).catch(err => callback(err, undefined));
 }
 
 
