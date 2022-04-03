@@ -51,7 +51,8 @@ async function getGcpCloudID(audience) {
         const oAuth2Client = await auth.getIdTokenClient(audience)
         const clientHeaders = await oAuth2Client.getRequestHeaders()
         const token = clientHeaders['Authorization'];
-        return res = Buffer.from(token.slice(7)).toString('base64')
+        const res = Buffer.from(token.slice(7)).toString('base64')
+        return res
     }
 }
 
