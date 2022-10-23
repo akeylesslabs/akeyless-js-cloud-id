@@ -15,7 +15,7 @@ Nodejs version 14.0.0 or higher.
 ## Installation
 ```
 npm install akeyless
-npm install akeyless-js-cloud-id
+npm install akeyless-cloud-id
 ```
 
 ## Getting Started
@@ -23,7 +23,7 @@ Please follow the installation instruction and execute the following Javascript 
 
 ```js
 const akeyless = require('akeyless')
-var akeylessCloud = require('akeyless-js-cloud-id')
+var akeylessCloud = require('akeyless-cloud-id')
 
 
 const AkeylessClient = new akeyless.ApiClient();
