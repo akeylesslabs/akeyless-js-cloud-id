@@ -3,8 +3,6 @@ const AWS = require('aws-sdk')
 const aws4 = require('aws4')
 const axios = require('axios')
 const { GoogleAuth } = require('google-auth-library');
-const { IAMCredentialsClient } = require('@google-cloud/iam-credentials');
-
 
 async function getCloudId(acc_type, param) {
     if (acc_type === "aws_iam") {
@@ -31,29 +29,17 @@ async function getAzureCloudID(object_id) {
 
 
 async function getGcpCloudID(audience) {
-    const auth = new GoogleAuth({
-        scopes: 'https://www.googleapis.com/auth/cloud-platform'
-    })
-
-    const crd = await auth.getApplicationDefault()
-    const minute = 60 * 1000;
-    const expiresAt = (Date.now() + minute * 10) / 1000
-
-    if (crd.credential.key && crd.credential.email) {
-        const iamclient = new IAMCredentialsClient()
-        const Payload = { 'aud': 'akeyless.io', 'exp': Math.round(expiresAt), 'sub': crd.credential.email }
-        const token = await iamclient.signJwt({
-            name: `projects/-/serviceAccounts/${crd.credential.email}`,
-            payload: JSON.stringify(Payload),
-        });
-        return Buffer.from(token[0].signedJwt).toString('base64')
-    } else {
-        const oAuth2Client = await auth.getIdTokenClient(audience)
-        const clientHeaders = await oAuth2Client.getRequestHeaders()
-        const token = clientHeaders['Authorization'];
-        const res = Buffer.from(token.slice(7)).toString('base64')
-        return res
+    if (!audience) {
+        audience = "akeyless.io"
     }
+
+    const googleAuth = new GoogleAuth();
+    const client = await googleAuth.getClient();
+  
+    const token = await client.fetchIdToken(audience);
+    const res = Buffer.from(token).toString('base64')
+
+    return res
 }
 
 function getAWsCloudId() {
