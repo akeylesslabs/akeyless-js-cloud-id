@@ -21,7 +21,7 @@
     "akeyless": "^2.0.15",
     "aws-sdk": "^2.876.0",
     "aws4": "^1.11.0",
-    "axios": "^0.28.0",
+    "axios": "v1.6",
     "google-auth-library": "^7.0.3"
   }
 }
