@@ -2,9 +2,9 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ "or-appsec" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "or-appsec" ]
+    branches: [ "main" ]
   schedule:
     - cron: '0 17 * * 0'
 
@@ -14,10 +14,7 @@ jobs:
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
     permissions:
-      # required for all workflows
       security-events: write
-
-      # only required for workflows in private repositories
       actions: read
       contents: read
 
