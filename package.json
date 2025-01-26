@@ -17,7 +17,6 @@
   },
   "homepage": "https://github.com/akeylesslabs/akeyless-js-cloud-id#readme",
   "dependencies": {
-    "@babel/core": "^7.26.0",
     "@google-cloud/iam-credentials": "^3.3.0",
     "akeyless": "^4.3.0",
     "aws-sdk": "^2.1692.0",
