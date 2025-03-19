@@ -27,9 +27,9 @@ async function getSecret(key, opts) {
 async function getSecretWithCloudId() {
     const accessType = "azure_ad"
     const cloudId = await akeylessCloud.getCloudId(accessType)
-    // const optsAws = { 'access-id': "p-xxxxxxxxxxxx", 'access-type': accessType, 'cloud-id': cloudId }
-    // const secret = await getSecret("my-secret", optsAws)    
-    console.log(cloudId)
+    const optsAws = { 'access-id': "p-xxxxxxxxxxxx", 'access-type': accessType, 'cloud-id': cloudId }
+    const secret = await getSecret("my-secret", optsAws)    
+    console.log(secret)
 }
     
 getSecretWithCloudId()
