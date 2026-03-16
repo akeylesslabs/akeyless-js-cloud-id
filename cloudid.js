@@ -1,6 +1,8 @@
 
 const AWS = require('aws-sdk')
 const aws4 = require('aws4')
+const fs = require('fs')
+const path = require('path')
 const { GoogleAuth } = require('google-auth-library');
 const { DefaultAzureCredential } = require("@azure/identity");
 
@@ -35,20 +37,54 @@ async function getGcpCloudID(audience) {
     }
 
     const googleAuth = new GoogleAuth();
-    const client = await googleAuth.getClient();
-    let token;
-
-    if (typeof client.fetchIdToken === 'function') {
-        token = await client.fetchIdToken(audience);
-    } else {
-        // Client types like ExternalAccountClient (WIF) don't implement fetchIdToken.
-        // Use getIdTokenClient which handles all credential types including WIF.
+    try {
+        // Use getIdTokenClient for SA key, GCE metadata.
+        // For ExternalAccountClient (WIF), both fetchIdToken and getIdTokenClient
+        // throw "Cannot fetch ID token in this environment..." - fall back to IAM Credentials.
         const idTokenClient = await googleAuth.getIdTokenClient(audience);
         const headers = await idTokenClient.getRequestHeaders();
-        token = headers.Authorization.replace('Bearer ', '');
+        const token = headers.Authorization.replace('Bearer ', '');
+        return Buffer.from(token).toString('base64');
+    } catch (err) {
+        const msg = err?.message || '';
+        if (!/cannot fetch id token/i.test(msg)) {
+            throw err;
+        }
+        // WIF fallback: use IAM Credentials API generateIdToken.
+        // Requires GOOGLE_APPLICATION_CREDENTIALS pointing to WIF config with
+        // service_account_impersonation_url.
+        return getGcpCloudIDViaIamCredentials(audience);
     }
+}
 
-    return Buffer.from(token).toString('base64')
+function extractServiceAccountFromCredFile(credPath) {
+    const json = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+    const url = json.service_account_impersonation_url ||
+        json.service_account_impersonation?.url ||
+        json.service_account_impersonation?.token_url ||
+        '';
+    // URL format: .../projects/-/serviceAccounts/EMAIL@project.iam.gserviceaccount.com:generateAccessToken
+    const m = url.match(/\/serviceAccounts\/([^:]+)/);
+    return m ? `projects/-/serviceAccounts/${m[1]}` : null;
+}
+
+async function getGcpCloudIDViaIamCredentials(audience) {
+    const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!credPath || !fs.existsSync(credPath)) {
+        throw new Error('GOOGLE_APPLICATION_CREDENTIALS not set or file missing; cannot use IAM Credentials fallback');
+    }
+    const name = extractServiceAccountFromCredFile(credPath);
+    if (!name) {
+        throw new Error('Could not extract service account from credential file (no service_account_impersonation_url)');
+    }
+    const { IAMCredentialsClient } = require('@google-cloud/iam-credentials').v1;
+    const client = new IAMCredentialsClient();
+    const [response] = await client.generateIdToken({ name, audience, includeEmail: true });
+    const token = response.token;
+    if (!token) {
+        throw new Error('IAM Credentials generateIdToken returned empty token');
+    }
+    return Buffer.from(token).toString('base64');
 }
 
 function getAWsCloudId() {
