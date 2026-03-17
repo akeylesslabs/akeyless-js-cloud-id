@@ -50,7 +50,8 @@ async function getGcpCloudID(audience) {
         if (!name) throw new Error('Invalid serviceAccountImpersonationUrl format');
         const [resp] = await new IAMCredentialsClient().generateIdToken({
             name,
-            audience
+            audience,
+            includeEmail: true
         });
         token = resp.token;
     } else {
