@@ -42,11 +42,10 @@ async function getGcpCloudID(audience) {
     if (typeof client.fetchIdToken === 'function') {
         token = await client.fetchIdToken(audience);
     } else if (client.serviceAccountImpersonationUrl) {
-        // WIF with SA impersonation: getIdTokenClient throws. Use IAM Credentials API.
-        // URL format: .../v1/projects/-/serviceAccounts/EMAIL:generateAccessToken
-        // name for generateIdToken: projects/-/serviceAccounts/EMAIL
+        // WIF: get ID token via IAM Credentials API.
+        // URL format: https://iamcredentials.googleapis.com/v1/{name=projects/*/serviceAccounts/*}:generateAccessToken
         const url = client.serviceAccountImpersonationUrl;
-        const name = url.split('/v1/')[1]?.split(':')[0];
+        const name = url.match(/projects\/[^:]+/)?.[0];
         if (!name) throw new Error('Invalid serviceAccountImpersonationUrl format');
         const [resp] = await new IAMCredentialsClient().generateIdToken({
             name,
@@ -55,6 +54,7 @@ async function getGcpCloudID(audience) {
         });
         token = resp.token;
     } else {
+        // Get ID token via getIdTokenClient (JWT, GCE, Impersonated).
         const idTokenClient = await googleAuth.getIdTokenClient(audience);
         const headers = await idTokenClient.getRequestHeaders();
         token = headers.Authorization.replace('Bearer ', '');
