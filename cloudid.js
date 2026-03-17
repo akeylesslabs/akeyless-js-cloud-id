@@ -45,6 +45,7 @@ async function getGcpCloudID(audience) {
         console.log('We handle WIF: client.getIdTokenClient is a function');
         // Client types like ExternalAccountClient (WIF) don't implement fetchIdToken.
         // Use getIdTokenClient which handles all credential types including WIF.
+        console.log('getGcpCloudID: we get the audience: and client: ', audience, client);
         const idTokenClient = await googleAuth.getIdTokenClient(audience);
         console.log('getGcpCloudID: we get the idTokenClient: ', idTokenClient);
         const headers = await idTokenClient.getRequestHeaders();
