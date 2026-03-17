@@ -3,6 +3,7 @@ const AWS = require('aws-sdk')
 const aws4 = require('aws4')
 const { GoogleAuth } = require('google-auth-library');
 const { DefaultAzureCredential } = require("@azure/identity");
+const { IAMCredentialsClient } = require('@google-cloud/iam-credentials')
 
 async function getCloudId(acc_type, param) {
     if (acc_type === "aws_iam") {
@@ -39,21 +40,24 @@ async function getGcpCloudID(audience) {
     let token;
 
     if (typeof client.fetchIdToken === 'function') {
-        console.log('We handle OIDC: client.fetchIdToken is a function');
         token = await client.fetchIdToken(audience);
+    } else if (client.serviceAccountImpersonationUrl) {
+        // WIF with SA impersonation: getIdTokenClient throws. Use IAM Credentials API.
+        // URL format: .../v1/projects/-/serviceAccounts/EMAIL:generateAccessToken
+        // name for generateIdToken: projects/-/serviceAccounts/EMAIL
+        const url = client.serviceAccountImpersonationUrl;
+        const name = url.split('/v1/')[1]?.split(':')[0];
+        if (!name) throw new Error('Invalid serviceAccountImpersonationUrl format');
+        const [resp] = await new IAMCredentialsClient().generateIdToken({
+            name,
+            audience
+        });
+        token = resp.token;
     } else {
-        console.log('We handle WIF: client.getIdTokenClient is a function');
-        // Client types like ExternalAccountClient (WIF) don't implement fetchIdToken.
-        // Use getIdTokenClient which handles all credential types including WIF.
-        console.log('getGcpCloudID: we get the audience: and client: ', audience, client);
         const idTokenClient = await googleAuth.getIdTokenClient(audience);
-        console.log('getGcpCloudID: we get the idTokenClient: ', idTokenClient);
         const headers = await idTokenClient.getRequestHeaders();
-        console.log('getGcpCloudID: we get the headers: ', headers);
         token = headers.Authorization.replace('Bearer ', '');
-        console.log('getGcpCloudID: we get the token: ', token);
     }
-    console.log('getGcpCloudID:we get the token: ', token);
     return Buffer.from(token).toString('base64')
 }
 
