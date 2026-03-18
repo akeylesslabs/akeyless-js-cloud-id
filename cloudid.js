@@ -54,7 +54,7 @@ async function getGcpCloudID(audience) {
         });
         token = resp.token;
     } else {
-        // Get ID token via getIdTokenClient (JWT, GCE, Impersonated).
+        // Get ID token via getIdTokenClient (for google-auth-library clients types: JWT, GCE, Impersonated).
         const idTokenClient = await googleAuth.getIdTokenClient(audience);
         const headers = await idTokenClient.getRequestHeaders();
         token = headers.Authorization.replace('Bearer ', '');
