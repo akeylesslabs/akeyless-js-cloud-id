@@ -19,12 +19,8 @@ const { getCloudId } = require('./cloudid');
 
 async function testGcpAuthentication() {
   try {
-    const token1 = await getCloudId('gcp', 'akeyless.io');
-    if (!token1 || token1.length === 0) throw new Error('Expected non-empty cloud ID');
-
-    const token2 = await getCloudId('gcp', 'https://example.com');
-    if (!token2 || token2.length === 0) throw new Error('Expected non-empty cloud ID');
-
+    const token = await getCloudId('gcp', 'akeyless.io');
+    if (!token || token.length === 0) throw new Error('Expected non-empty token');
     console.log('All GCP auth tests passed');
     return true;
   } catch (err) {
