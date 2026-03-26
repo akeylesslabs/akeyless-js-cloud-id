@@ -3,6 +3,7 @@ const AWS = require('aws-sdk')
 const aws4 = require('aws4')
 const { GoogleAuth } = require('google-auth-library');
 const { DefaultAzureCredential } = require("@azure/identity");
+const { IAMCredentialsClient } = require('@google-cloud/iam-credentials')
 
 async function getCloudId(acc_type, param) {
     if (acc_type === "aws_iam") {
@@ -36,11 +37,29 @@ async function getGcpCloudID(audience) {
 
     const googleAuth = new GoogleAuth();
     const client = await googleAuth.getClient();
-  
-    const token = await client.fetchIdToken(audience);
-    const res = Buffer.from(token).toString('base64')
+    let token;
 
-    return res
+    if (typeof client.fetchIdToken === 'function') {
+        token = await client.fetchIdToken(audience);
+    } else if (client.serviceAccountImpersonationUrl) {
+        // WIF: get ID token via IAM Credentials API.
+        // URL format: https://iamcredentials.googleapis.com/v1/{name=projects/*/serviceAccounts/*}:generateAccessToken
+        const url = client.serviceAccountImpersonationUrl;
+        const name = url.match(/projects\/[^:]+/)?.[0];
+        if (!name) throw new Error('Invalid serviceAccountImpersonationUrl format');
+        const [resp] = await new IAMCredentialsClient().generateIdToken({
+            name,
+            audience,
+            includeEmail: true
+        });
+        token = resp.token;
+    } else {
+        // Get ID token via getIdTokenClient (for google-auth-library clients types: JWT, GCE, Impersonated).
+        const idTokenClient = await googleAuth.getIdTokenClient(audience);
+        const headers = await idTokenClient.getRequestHeaders();
+        token = headers.Authorization.replace('Bearer ', '');
+    }
+    return Buffer.from(token).toString('base64')
 }
 
 function getAWsCloudId() {
