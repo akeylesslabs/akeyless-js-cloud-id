@@ -1,0 +1,34 @@
+name: "Tests"
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  js-test:
+    name: JS Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Pinned to Node 20 LTS: a transitive dependency (buffer-equal-constant-time,
+          # pulled in via google-auth-library@7 -> jws/jwa) relies on Buffer.SlowBuffer,
+          # which was removed in Node 24+. The SDK cannot be required on newer runtimes
+          # until that dependency chain is upgraded.
+          node-version: "20"
+
+      # NOTE: `npm ci` currently fails against this repo's lockfile (known drift;
+      # see PR #32). Using `npm install` until the lockfile fix lands on the
+      # default branch, after which this can switch back to `npm ci`.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
