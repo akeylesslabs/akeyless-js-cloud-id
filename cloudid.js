@@ -4,6 +4,12 @@ const { GoogleAuth } = require('google-auth-library');
 const { DefaultAzureCredential } = require("@azure/identity");
 const { IAMCredentialsClient } = require('@google-cloud/iam-credentials')
 
+/**
+ * Returns a provider-specific cloud-id for Akeyless auth.
+ * @param {string} acc_type One of: aws_iam, azure_ad, gcp, access_key
+ * @param {string} [param] Optional provider param (Azure object id / GCP audience)
+ * @returns {Promise<string>} Base64-encoded cloud-id (empty string for access_key)
+ */
 async function getCloudId(acc_type, param) {
     if (acc_type === "aws_iam") {
         return getAWsCloudId()
@@ -18,6 +24,11 @@ async function getCloudId(acc_type, param) {
     }
 }
 
+/**
+ * Builds an Azure AD cloud-id (base64 access token) via DefaultAzureCredential.
+ * @param {string} [object_id] Reserved; not used by the current implementation
+ * @returns {Promise<string>} Base64-encoded Azure access token
+ */
 async function getAzureCloudID(object_id) {
  
     const credential = new DefaultAzureCredential();
@@ -29,6 +40,11 @@ async function getAzureCloudID(object_id) {
 }
 
 
+/**
+ * Builds a GCP cloud-id (base64 ID token) via Application Default Credentials / WIF.
+ * @param {string} [audience='akeyless.io'] JWT audience
+ * @returns {Promise<string>} Base64-encoded GCP ID token
+ */
 async function getGcpCloudID(audience) {
     if (!audience) {
         audience = "akeyless.io"
@@ -61,6 +77,12 @@ async function getGcpCloudID(audience) {
     return Buffer.from(token).toString('base64')
 }
 
+/**
+ * Builds an AWS IAM cloud-id for Akeyless auth.
+ * Resolves credentials via the AWS SDK v3 Node default provider chain
+ * (`fromNodeProviderChain`), then signs a local STS GetCallerIdentity request.
+ * @returns {Promise<string>} Base64-encoded cloud-id token
+ */
 function getAWsCloudId() {
     return new Promise((resolve, reject) => {
         fromNodeProviderChain()()
@@ -69,6 +91,12 @@ function getAWsCloudId() {
     })
 }
 
+/**
+ * Signs an STS GetCallerIdentity request with the given AWS credentials and
+ * packages it as a base64 cloud-id blob (Akeyless later replays this to STS).
+ * @param {{accessKeyId: string, secretAccessKey: string, sessionToken?: string}} creds AWS credentials
+ * @returns {string} Base64-encoded cloud-id token
+ */
 function stsGetCallerIdentity(creds) {
 
     const opts3 = { method: 'POST', service: 'sts', body: 'Action=GetCallerIdentity&Version=2011-06-15', region: 'us-east-1' }

@@ -64,6 +64,10 @@ const FAKE_ACCESS_KEY = 'AKIDEXAMPLE';
 const FAKE_SECRET_KEY = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
 const FAKE_SESSION_TOKEN = 'FQoGZXIvYXdzEXAMPLESESSIONTOKEN//////////fake';
 
+/**
+ * Sets fake AWS credential env vars for hermetic unit tests.
+ * @param {{session?: boolean}} [opts] When session is true, also sets AWS_SESSION_TOKEN
+ */
 function setEnvCreds({ session } = {}) {
   process.env.AWS_ACCESS_KEY_ID = FAKE_ACCESS_KEY;
   process.env.AWS_SECRET_ACCESS_KEY = FAKE_SECRET_KEY;
@@ -74,6 +78,7 @@ function setEnvCreds({ session } = {}) {
   }
 }
 
+/** Clears AWS credential env vars used by hermetic unit tests. */
 function clearEnvCreds() {
   delete process.env.AWS_ACCESS_KEY_ID;
   delete process.env.AWS_SECRET_ACCESS_KEY;
@@ -283,7 +288,7 @@ describe('AWS cloud-id token construction (offline SigV4)', () => {
       await assert.rejects(
         () => cloudid.getAWsCloudId(),
         (err) => {
-          // AWS SDK v3 raises CredentialsProviderError; must not be our net guard.
+          // AWS SDK v3 raises CredentialsProviderError; must not be our net guard firing.
           assert.ok(!err.netguard, 'no network should be attempted while resolving creds');
           assert.match(String(err.code || err.name || err.message), /Credentials/i);
           return true;
