@@ -1,5 +1,4 @@
-
-const AWS = require('aws-sdk')
+const { fromNodeProviderChain } = require('@aws-sdk/credential-providers')
 const aws4 = require('aws4')
 const { GoogleAuth } = require('google-auth-library');
 const { DefaultAzureCredential } = require("@azure/identity");
@@ -64,14 +63,9 @@ async function getGcpCloudID(audience) {
 
 function getAWsCloudId() {
     return new Promise((resolve, reject) => {
-        AWS.config.getCredentials(function (err) {
-            if (err) {
-                reject(err)
-            } else {
-                const result = stsGetCallerIdentity(AWS.config.credentials)
-                resolve(result)
-            }
-        })    
+        fromNodeProviderChain()()
+            .then((creds) => resolve(stsGetCallerIdentity(creds)))
+            .catch(reject)
     })
 }
 
