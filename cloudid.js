@@ -4,6 +4,7 @@ const aws4 = require('aws4')
 const { GoogleAuth } = require('google-auth-library');
 const { DefaultAzureCredential } = require("@azure/identity");
 const { IAMCredentialsClient } = require('@google-cloud/iam-credentials')
+const { getAlibabaCloudId } = require('./alibaba')
 
 async function getCloudId(acc_type, param) {
     if (acc_type === "aws_iam") {
@@ -12,6 +13,8 @@ async function getCloudId(acc_type, param) {
         return getAzureCloudID(param)
     } else if (acc_type === "gcp") {
         return getGcpCloudID(param)
+    } else if (acc_type === "ali_cloud") {
+        return getAlibabaCloudId()
     } else if (acc_type === "access_key") {
         return ""
     } else {
@@ -106,10 +109,10 @@ function stsGetCallerIdentity(creds) {
     return Buffer.from(awsData).toString('base64')
 }
 
-
 module.exports = {
     getAWsCloudId: getAWsCloudId,
     getAzureCloudID: getAzureCloudID,
     getGcpCloudID: getGcpCloudID,
+    getAlibabaCloudId: getAlibabaCloudId,
     getCloudId: getCloudId,
 }
