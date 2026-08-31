@@ -191,14 +191,14 @@ describe('getCloudId provider dispatch', () => {
     }
   });
 
-  test('ali_cloud type dispatches to the Alibaba provider (not the invalid-type branch)', async () => {
+  test('alicloud type dispatches to the Alibaba provider (not the invalid-type branch)', async () => {
     // Offline: without env credentials the Alibaba path tries ECS metadata,
     // which the network guard blocks. We assert only that dispatch entered
     // the Alibaba branch, never that a live token was produced.
     networkBlocked = true;
     try {
       await assert.rejects(
-        () => cloudid.getCloudId('ali_cloud'),
+        () => cloudid.getCloudId('alicloud'),
         (err) => {
           assert.doesNotMatch(err.message, /Invalid access type/);
           return true;
