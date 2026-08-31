@@ -4,7 +4,7 @@
  * Hermetic unit tests for the akeyless-cloud-id SDK (cloudid.js).
  *
  * These tests run fully offline. Before requiring the SDK (and, transitively,
- * aws-sdk / google-auth-library / @azure/identity) we:
+ * @aws-sdk/credential-providers / google-auth-library / @azure/identity) we:
  *   - point HOME and the AWS credential/config files at an empty temp dir so no
  *     ambient ~/.aws credentials or profiles can leak in,
  *   - disable the EC2 instance-metadata provider,
@@ -30,7 +30,7 @@ const isoHome = fs.mkdtempSync(path.join(os.tmpdir(), 'cloudid-test-home-'));
 const isoCreds = path.join(isoHome, 'credentials');
 const isoConfig = path.join(isoHome, 'config');
 // Empty (but existing) files: no profiles/keys inside, so nothing leaks in, yet
-// aws-sdk can still stat/read them without raising ENOENT.
+// the credential provider can still stat/read them without raising ENOENT.
 fs.writeFileSync(isoCreds, '');
 fs.writeFileSync(isoConfig, '');
 process.env.HOME = isoHome;
@@ -38,8 +38,6 @@ process.env.USERPROFILE = isoHome; // Windows equivalent
 process.env.AWS_SHARED_CREDENTIALS_FILE = isoCreds;
 process.env.AWS_CONFIG_FILE = isoConfig;
 process.env.AWS_EC2_METADATA_DISABLED = 'true';
-// NOTE: do NOT set AWS_SDK_LOAD_CONFIG here — aws-sdk treats any non-empty value
-// (even "0") as enabled, which would force-load the config file.
 delete process.env.AWS_SDK_LOAD_CONFIG;
 delete process.env.AWS_ACCESS_KEY_ID;
 delete process.env.AWS_SECRET_ACCESS_KEY;
@@ -59,7 +57,6 @@ net.Socket.prototype.connect = function guardedConnect(...args) {
   return realConnect.apply(this, args);
 };
 
-const AWS = require('aws-sdk');
 const cloudid = require('./cloudid');
 
 // Well-formed but fake credentials (AWS docs example key id + secret).
@@ -67,6 +64,10 @@ const FAKE_ACCESS_KEY = 'AKIDEXAMPLE';
 const FAKE_SECRET_KEY = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
 const FAKE_SESSION_TOKEN = 'FQoGZXIvYXdzEXAMPLESESSIONTOKEN//////////fake';
 
+/**
+ * Sets fake AWS credential env vars for hermetic unit tests.
+ * @param {{session?: boolean}} [opts] When session is true, also sets AWS_SESSION_TOKEN
+ */
 function setEnvCreds({ session } = {}) {
   process.env.AWS_ACCESS_KEY_ID = FAKE_ACCESS_KEY;
   process.env.AWS_SECRET_ACCESS_KEY = FAKE_SECRET_KEY;
@@ -75,15 +76,13 @@ function setEnvCreds({ session } = {}) {
   } else {
     delete process.env.AWS_SESSION_TOKEN;
   }
-  // Force aws-sdk to re-resolve credentials from the (updated) environment.
-  AWS.config.credentials = null;
 }
 
+/** Clears AWS credential env vars used by hermetic unit tests. */
 function clearEnvCreds() {
   delete process.env.AWS_ACCESS_KEY_ID;
   delete process.env.AWS_SECRET_ACCESS_KEY;
   delete process.env.AWS_SESSION_TOKEN;
-  AWS.config.credentials = null;
 }
 
 // Decode the base64(JSON) cloud-id token into its outer object and the inner
@@ -289,7 +288,7 @@ describe('AWS cloud-id token construction (offline SigV4)', () => {
       await assert.rejects(
         () => cloudid.getAWsCloudId(),
         (err) => {
-          // aws-sdk raises a CredentialsError; must not be our net guard firing.
+          // AWS SDK v3 raises CredentialsProviderError; must not be our net guard firing.
           assert.ok(!err.netguard, 'no network should be attempted while resolving creds');
           assert.match(String(err.code || err.name || err.message), /Credentials/i);
           return true;
