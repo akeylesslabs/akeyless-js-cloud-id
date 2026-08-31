@@ -7,7 +7,7 @@ const { getAlibabaCloudId } = require('./alibaba')
 
 /**
  * Returns a provider-specific cloud-id for Akeyless auth.
- * @param {string} acc_type One of: aws_iam, azure_ad, gcp, access_key
+ * @param {string} acc_type One of: aws_iam, azure_ad, gcp, ali_cloud, access_key
  * @param {string} [param] Optional provider param (Azure object id / GCP audience)
  * @returns {Promise<string>} Base64-encoded cloud-id (empty string for access_key)
  */

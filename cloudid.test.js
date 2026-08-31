@@ -104,7 +104,7 @@ after(() => {
 // ---------------------------------------------------------------------------
 describe('module loads and exports are intact', () => {
   test('exports the documented public API as functions', () => {
-    for (const name of ['getCloudId', 'getAWsCloudId', 'getAzureCloudID', 'getGcpCloudID']) {
+    for (const name of ['getCloudId', 'getAWsCloudId', 'getAzureCloudID', 'getGcpCloudID', 'getAlibabaCloudId']) {
       assert.strictEqual(typeof cloudid[name], 'function', `${name} should be a function`);
     }
   });
@@ -112,7 +112,7 @@ describe('module loads and exports are intact', () => {
   test('does not export unexpected extra symbols', () => {
     assert.deepStrictEqual(
       Object.keys(cloudid).sort(),
-      ['getAWsCloudId', 'getAzureCloudID', 'getCloudId', 'getGcpCloudID']
+      ['getAWsCloudId', 'getAlibabaCloudId', 'getAzureCloudID', 'getCloudId', 'getGcpCloudID']
     );
   });
 });
@@ -181,6 +181,24 @@ describe('getCloudId provider dispatch', () => {
     try {
       await assert.rejects(
         () => cloudid.getCloudId('gcp', 'akeyless.io'),
+        (err) => {
+          assert.doesNotMatch(err.message, /Invalid access type/);
+          return true;
+        }
+      );
+    } finally {
+      networkBlocked = false;
+    }
+  });
+
+  test('ali_cloud type dispatches to the Alibaba provider (not the invalid-type branch)', async () => {
+    // Offline: without env credentials the Alibaba path tries ECS metadata,
+    // which the network guard blocks. We assert only that dispatch entered
+    // the Alibaba branch, never that a live token was produced.
+    networkBlocked = true;
+    try {
+      await assert.rejects(
+        () => cloudid.getCloudId('ali_cloud'),
         (err) => {
           assert.doesNotMatch(err.message, /Invalid access type/);
           return true;

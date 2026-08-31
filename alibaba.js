@@ -7,6 +7,12 @@ const ALIBABA_STS_API_VERSION = '2015-04-01'
 const ALIBABA_STS_API_ACTION = 'GetCallerIdentity'
 const ALIBABA_STS_API_FORMAT = 'JSON'
 const ALIBABA_SIGNATURE_METHOD = 'HMAC-SHA1'
+const ALIBABA_METADATA_HOST = '100.100.100.200'
+const ALIBABA_METADATA_BASE = `http://${ALIBABA_METADATA_HOST}/latest/`
+const ALIBABA_METADATA_TOKEN_URL = `${ALIBABA_METADATA_BASE}api/token`
+const ALIBABA_METADATA_ROLE_URL = `${ALIBABA_METADATA_BASE}meta-data/ram/security-credentials/`
+const ALIBABA_METADATA_TIMEOUT_MS = 2000
+const ALIBABA_IMDS_TOKEN_TTL_SECONDS = '60'
 
 async function getAlibabaCloudId() {
     const creds = await resolveAlibabaCredentials()
@@ -86,35 +92,76 @@ async function resolveAlibabaCredentials() {
     return resolveAlibabaEcsRamRoleCredentials()
 }
 
-function resolveAlibabaEcsRamRoleCredentials() {
-    return httpGet('http://100.100.100.200/latest/meta-data/ram/security-credentials/').then((roleName) => {
-        roleName = (roleName || '').trim()
-        if (!roleName) {
-            throw new Error('alibaba credentials are missing access key id or secret')
-        }
-        return httpGet('http://100.100.100.200/latest/meta-data/ram/security-credentials/' + roleName)
-    }).then((body) => {
-        const json = JSON.parse(body)
-        return {
-            accessKeyId: json.AccessKeyId,
-            accessKeySecret: json.AccessKeySecret,
-            securityToken: json.SecurityToken || '',
-        }
-    })
+/**
+ * Resolves RAM-role credentials from ECS instance metadata.
+ * Prefers IMDSv2 (security-hardening mode): PUT /latest/api/token, then send
+ * X-aliyun-ecs-metadata-token on both credential GETs. Falls back to IMDSv1
+ * only if the token request fails (older instances still in normal mode).
+ * @returns {Promise<{accessKeyId: string, accessKeySecret: string, securityToken: string}>}
+ */
+async function resolveAlibabaEcsRamRoleCredentials() {
+    const token = await fetchAlibabaImdsV2Token()
+    const headers = {}
+    if (token) {
+        headers['X-aliyun-ecs-metadata-token'] = token
+    }
+    const roleName = (await metadataRequest(ALIBABA_METADATA_ROLE_URL, { headers })).trim()
+    if (!roleName || roleName.includes('/') || roleName.includes('\\')) {
+        throw new Error('alibaba credentials are missing access key id or secret')
+    }
+    const body = await metadataRequest(ALIBABA_METADATA_ROLE_URL + roleName, { headers })
+    const json = JSON.parse(body)
+    return {
+        accessKeyId: json.AccessKeyId,
+        accessKeySecret: json.AccessKeySecret,
+        securityToken: json.SecurityToken || '',
+    }
 }
 
-function httpGet(url) {
+/**
+ * Fetches an ECS IMDSv2 session token. Returns empty string if the instance
+ * does not support security-hardening mode, so callers can fall back to IMDSv1.
+ * @returns {Promise<string>}
+ */
+async function fetchAlibabaImdsV2Token() {
+    try {
+        return (await metadataRequest(ALIBABA_METADATA_TOKEN_URL, {
+            method: 'PUT',
+            headers: { 'X-aliyun-ecs-metadata-token-ttl-seconds': ALIBABA_IMDS_TOKEN_TTL_SECONDS },
+        })).trim()
+    } catch (_) {
+        return ''
+    }
+}
+
+/**
+ * Issues an HTTP request to the Alibaba ECS metadata service only.
+ * @param {string} url Absolute metadata URL (must stay on 100.100.100.200)
+ * @param {{method?: string, headers?: Record<string, string>}} [opts]
+ * @returns {Promise<string>} Response body
+ */
+function metadataRequest(url, { method = 'GET', headers = {} } = {}) {
+    if (!url.startsWith(ALIBABA_METADATA_BASE)) {
+        return Promise.reject(new Error('alibaba metadata request has invalid url'))
+    }
     return new Promise((resolve, reject) => {
-        const req = http.get(url, { timeout: 2000 }, (res) => {
+        const req = http.request(url, { method, headers, timeout: ALIBABA_METADATA_TIMEOUT_MS }, (res) => {
             let data = ''
             res.on('data', (chunk) => { data += chunk })
-            res.on('end', () => resolve(data))
+            res.on('end', () => {
+                if (res.statusCode < 200 || res.statusCode >= 300) {
+                    reject(new Error(`alibaba metadata request failed with status ${res.statusCode}`))
+                    return
+                }
+                resolve(data)
+            })
         })
         req.on('error', reject)
         req.on('timeout', () => {
             req.destroy()
             reject(new Error('alibaba metadata request timed out'))
         })
+        req.end()
     })
 }
 
@@ -131,6 +178,7 @@ module.exports = {
     buildAlibabaCloudId,
     buildAlibabaRpcStringToSign,
     alibabaShaHmac1,
+    resolveAlibabaEcsRamRoleCredentials,
     ALIBABA_DEFAULT_REGION,
     ALIBABA_STS_API_ACTION,
     ALIBABA_STS_API_VERSION,
