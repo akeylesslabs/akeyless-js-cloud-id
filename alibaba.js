@@ -145,21 +145,37 @@ function metadataRequest(url, { method = 'GET', headers = {} } = {}) {
         return Promise.reject(new Error('alibaba metadata request has invalid url'))
     }
     return new Promise((resolve, reject) => {
+        let settled = false
+        const finish = (fn, value) => {
+            if (settled) {
+                return
+            }
+            settled = true
+            fn(value)
+        }
         const req = http.request(url, { method, headers, timeout: ALIBABA_METADATA_TIMEOUT_MS }, (res) => {
             let data = ''
+            let ended = false
             res.on('data', (chunk) => { data += chunk })
             res.on('end', () => {
+                ended = true
                 if (res.statusCode < 200 || res.statusCode >= 300) {
-                    reject(new Error(`alibaba metadata request failed with status ${res.statusCode}`))
+                    finish(reject, new Error(`alibaba metadata request failed with status ${res.statusCode}`))
                     return
                 }
-                resolve(data)
+                finish(resolve, data)
+            })
+            res.on('error', (err) => finish(reject, err))
+            res.on('close', () => {
+                if (!ended) {
+                    finish(reject, new Error('alibaba metadata response closed before completion'))
+                }
             })
         })
-        req.on('error', reject)
+        req.on('error', (err) => finish(reject, err))
         req.on('timeout', () => {
             req.destroy()
-            reject(new Error('alibaba metadata request timed out'))
+            finish(reject, new Error('alibaba metadata request timed out'))
         })
         req.end()
     })

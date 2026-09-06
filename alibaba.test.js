@@ -100,8 +100,17 @@ function mockMetadata(responses) {
           return;
         }
         cb(res);
+        if (next.resError) {
+          res.emit('error', next.resError);
+          return;
+        }
         if (next.body) res.emit('data', next.body);
+        if (next.incompleteClose) {
+          res.emit('close');
+          return;
+        }
         res.emit('end');
+        res.emit('close');
       });
     };
     return req;
@@ -159,6 +168,40 @@ test('ECS RAM role credentials fall back to IMDSv1 when the token request fails'
     assert.strictEqual(
       mock.calls[2].url,
       'http://100.100.100.200/latest/meta-data/ram/security-credentials/legacy-role'
+    );
+  } finally {
+    mock.restore();
+  }
+});
+
+test('ECS metadata request rejects when the response stream errors', async () => {
+  const streamErr = new Error('metadata stream failed');
+  const mock = mockMetadata([
+    { statusCode: 200, body: 'imds-token' },
+    { resError: streamErr },
+  ]);
+  try {
+    await assert.rejects(
+      () => alibaba.resolveAlibabaEcsRamRoleCredentials(),
+      (err) => {
+        assert.strictEqual(err, streamErr);
+        return true;
+      }
+    );
+  } finally {
+    mock.restore();
+  }
+});
+
+test('ECS metadata request rejects when the response closes before end', async () => {
+  const mock = mockMetadata([
+    { statusCode: 200, body: 'imds-token' },
+    { body: 'partial-role', incompleteClose: true },
+  ]);
+  try {
+    await assert.rejects(
+      () => alibaba.resolveAlibabaEcsRamRoleCredentials(),
+      /closed before completion/
     );
   } finally {
     mock.restore();
