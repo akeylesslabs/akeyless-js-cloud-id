@@ -7,7 +7,7 @@
  * so CI never fails when no secrets are configured. To run it, export:
  *
  *   AKEYLESS_CLOUD_ID_E2E=1
- *   AKEYLESS_CLOUD_ID_E2E_TYPE=aws_iam|azure_ad|gcp   (default: aws_iam)
+ *   AKEYLESS_CLOUD_ID_E2E_TYPE=aws_iam|azure_ad|gcp|alicloud   (default: aws_iam)
  *   AKEYLESS_CLOUD_ID_E2E_PARAM=<object-id | audience> (optional, provider-specific)
  *
  * plus whatever ambient credentials that provider needs (e.g. AWS_* env vars /
